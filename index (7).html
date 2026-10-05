@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ky">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SNAKE — NEON CHALLENGE</title>
+<style>
+/* ===== ТҮСТӨР ЖАНА ӨЛЧӨМДӨР ===== */
+:root{--a:hsl(140 100% 55%);--b:hsl(185 100% 55%);--food:#ff3d9a;--hue:0deg;--w:min(92vw,54vh,560px)}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:#05060d;color:#e8f0ff;font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:8px;overflow:hidden;user-select:none;touch-action:manipulation}
+
+/* ===== ФОН (жандуу градиент + orb'дор + бөлүкчөлөр) ===== */
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;filter:hue-rotate(var(--hue));transition:filter 1.5s;background:linear-gradient(120deg,#05060d,#0a1030,#1a0a33,#05060d);background-size:300% 300%;animation:flow 16s ease infinite}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;animation:drift 14s ease-in-out infinite}
+.o1{width:380px;height:380px;background:var(--a);top:-8%;left:-6%}.o2{width:340px;height:340px;background:var(--b);bottom:-8%;right:-4%;animation-delay:-5s}.o3{width:260px;height:260px;background:#a14dff;top:40%;left:55%;animation-delay:-9s;opacity:.2}
+.dot{position:absolute;bottom:-10px;border-radius:50%;background:#fff;opacity:.4;animation:rise linear infinite}
+@keyframes flow{50%{background-position:100% 100%}}
+@keyframes drift{50%{transform:translate(50px,-40px) scale(1.15)}}
+@keyframes rise{to{transform:translateY(-110vh);opacity:0}}
+
+/* ===== SCORE / LEVEL / HIGH SCORE ===== */
+.hud{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:8px;width:var(--w)}
+.card{background:rgba(255,255,255,.06);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:6px 8px;text-align:center}
+.card small{display:block;font-size:.6rem;letter-spacing:.25em;color:#8aa0c8}
+.card b{font-size:1.3rem;font-weight:800;letter-spacing:.06em;display:inline-block}
+.card.big b{font-size:2.1rem;color:var(--a);text-shadow:0 0 18px var(--a)}
+.pop{animation:pop .3s}
+@keyframes pop{50%{transform:scale(1.35)}}
+
+/* ===== ОЮН ТАЛААСЫ ===== */
+.board{position:relative;width:var(--w);aspect-ratio:1;padding:6px;border-radius:24px;background:rgba(255,255,255,.05);backdrop-filter:blur(10px);border:2px solid var(--a);box-shadow:0 0 30px -4px var(--a),0 20px 50px rgba(0,0,0,.6)}
+.board.flash{animation:flash .9s}
+@keyframes flash{30%{box-shadow:0 0 70px 6px var(--b)}}
+canvas{width:100%;height:100%;display:block;border-radius:18px;background:#070a16}
+.ov{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px;background:rgba(5,6,13,.8);backdrop-filter:blur(8px);border-radius:22px;transition:opacity .5s,visibility .5s}
+.ov.hide{opacity:0;visibility:hidden;pointer-events:none}
+.title{font-size:clamp(2.6rem,13vw,4.8rem);font-weight:900;letter-spacing:.15em;line-height:1;background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 16px var(--a))}
+.sub{letter-spacing:.35em;font-size:.8rem;color:var(--b)}
+.ready{font-size:1.1rem;letter-spacing:.2em;margin-top:8px}
+.line{font-size:1.15rem;letter-spacing:.12em}
+.btn{border:0;cursor:pointer;color:#05060d;background:linear-gradient(90deg,var(--a),var(--b));font:800 1rem 'Segoe UI',sans-serif;padding:14px 30px;border-radius:40px;letter-spacing:.1em;box-shadow:0 0 24px -2px var(--a);transition:.25s}
+.btn:hover{transform:scale(1.07);box-shadow:0 0 36px 0 var(--a)}.btn:active{transform:scale(.96)}
+.btn.ghost{background:rgba(255,255,255,.08);color:#e8f0ff;border:1px solid rgba(255,255,255,.2);box-shadow:none;padding:9px 14px;font-size:.75rem}
+.btn.ghost:hover{border-color:var(--a);box-shadow:0 0 16px -2px var(--a)}
+#count{font-size:6rem;font-weight:900;color:var(--a);text-shadow:0 0 30px var(--a);animation:zoom .7s}
+@keyframes zoom{from{transform:scale(2);opacity:0}}
+#lvlup{position:absolute;inset:0;z-index:4;display:grid;place-items:center;font-size:clamp(1.8rem,8vw,3rem);font-weight:900;color:#fff;text-shadow:0 0 25px var(--b);pointer-events:none;opacity:0}
+#lvlup.show{animation:up 1.3s}
+@keyframes up{0%{opacity:0;transform:scale(.5)}25%{opacity:1;transform:scale(1.15)}75%{opacity:1}100%{opacity:0;transform:translateY(-40px)}}
+#speed{position:absolute;top:12px;right:14px;z-index:3;font-size:.7rem;font-weight:800;letter-spacing:.15em;color:#ffb347;text-shadow:0 0 12px #ff7a18;opacity:0;transition:.4s}
+#speed.on{opacity:1;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.4}}
+.newhi{font-size:1.4rem;font-weight:900;color:#ffd84d;text-shadow:0 0 20px #ffb300;animation:zoom .8s infinite alternate}
+
+/* ===== PROGRESS + БАШКАРУУ ===== */
+.prog{width:var(--w)}
+.row{display:flex;justify-content:space-between;font-size:.7rem;letter-spacing:.15em;color:#9db0d8;margin-bottom:5px}
+.bar{height:12px;border-radius:8px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));box-shadow:0 0 14px var(--a);transition:width .3s}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.dpad{display:none;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,60px);gap:8px}
+.dpad button{border-radius:18px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:1.6rem;backdrop-filter:blur(8px)}
+.dpad button:active{background:var(--a);color:#000}
+.dpad .u{grid-column:2}.dpad .l{grid-row:2}.dpad .d{grid-column:2;grid-row:2}.dpad .r{grid-column:3;grid-row:2}
+@media(hover:none),(max-width:700px){.dpad{display:grid}:root{--w:min(92vw,42vh,520px)}}
+@media(max-height:560px) and (orientation:landscape){:root{--w:min(60vh,70vw)}.dpad{display:none}}
+</style>
+</head>
+<body>
+<div class="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+
+<!-- SCORE / LEVEL / HIGH SCORE -->
+<div class="hud">
+  <div class="card"><small>LEVEL</small><b id="lv">1</b></div>
+  <div class="card big"><small>SCORE</small><b id="sc">0000</b></div>
+  <div class="card"><small>HIGH SCORE</small><b id="hs">0000</b></div>
+</div>
+
+<!-- ОЮН ТАЛААСЫ -->
+<div class="board" id="board">
+  <canvas id="cv" aria-label="Snake оюн талаасы"></canvas>
+  <div id="speed">🔥 SPEED MODE</div>
+  <div id="lvlup">LEVEL UP! 🔥</div>
+
+  <div class="ov" id="ovStart">
+    <div class="title">SNAKE</div><div class="sub">NEON CHALLENGE</div>
+    <div class="ready">READY TO PLAY?</div>
+    <button class="btn" id="btnStart">▶ START GAME</button>
+    <small style="color:#8aa0c8;letter-spacing:.1em">← ↑ ↓ → · WASD · SPACE = PAUSE</small>
+  </div>
+  <div class="ov hide" id="ovCount"><div id="count">3</div></div>
+  <div class="ov hide" id="ovPause"><div class="title" style="font-size:2.6rem">PAUSED</div><button class="btn" id="btnResume">▶ RESUME</button></div>
+  <div class="ov hide" id="ovOver">
+    <div class="title" style="font-size:clamp(2rem,10vw,3.4rem)">GAME OVER</div>
+    <div class="newhi" id="newhi" hidden>🏆 NEW HIGH SCORE!</div>
+    <div class="line">SCORE: <b id="oScore">0000</b></div>
+    <div class="line">LEVEL: <b id="oLevel">1</b></div>
+    <div class="line">BEST SCORE: <b id="oBest">0000</b></div>
+    <button class="btn" id="btnAgain">🔄 PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="prog">
+  <div class="row"><span id="pLevel">LEVEL 1</span><span id="pNext">NEXT LEVEL: 5</span></div>
+  <div class="bar"><i id="barFill"></i></div>
+</div>
+
+<!-- PAUSE + SETTINGS -->
+<div class="ctrl">
+  <button class="btn ghost" id="btnPause">⏸ PAUSE</button>
+  <button class="btn ghost" id="btnSound">🔊 SOUND: ON</button>
+  <button class="btn ghost" id="btnTheme">🌙 THEME</button>
+</div>
+
+<!-- ТЕЛЕФОН ҮЧҮН БАШКАРУУ -->
+<div class="dpad">
+  <button class="u" data-d="0,-1" aria-label="Өйдө">↑</button><button class="l" data-d="-1,0" aria-label="Солго">←</button>
+  <button class="d" data-d="0,1" aria-label="Ылдый">↓</button><button class="r" data-d="1,0" aria-label="Оңго">→</button>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+
+/* ===== НАСТРОЙКАЛАР (өзгөртсө болот) ===== */
+const N = 20, CELL = 30;     // талаа 20x20 торчо
+const STEP = 5;              // ар 5 упайда жаңы деңгээл
+const SPEEDS = [190, 165, 140, 120, 100, 85, 70, 58];   // ms: деңгээл 1..8 (азыраак = тезирээк)
+const NAMES = ['SEKIN', 'JAYIRAAK', 'KICHINE TEZ', 'ORTOCHO', 'TEZ', 'ABDAN TEZ', 'OTO TEZ', 'EXTREME'];
+const THEMES = [{h1: 140, h2: 185}, {h1: 320, h2: 265}, {h1: 38, h2: 5}];  // түс темалары (hue)
+
+const cv = $('#cv'), ctx = cv.getContext('2d');
+cv.width = cv.height = N * CELL;
+
+/* ===== ОЮНДУН АБАЛЫ ===== */
+let state = 'menu';          // menu | count | play | pause | over
+let snake, prev, dir, queue, food, score, level, interval, last = 0, parts = [], shake = 0;
+let hi = 0, soundOn = true, themeIdx = 0, ac = null, countTimer = null;
+try { hi = +localStorage.getItem('snake-hi') || 0; } catch (e) {}
+
+/* ===== ҮН (Web Audio API, mp3 керек эмес) ===== */
+function tone(f, d, type = 'sine', v = .16, slide = 1, delay = 0) {
+  if (!soundOn || !ac) return;
+  const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + delay;
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide !== 1) o.frequency.exponentialRampToValueAtTime(f * slide, t + d);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + d);
+}
+const sfx = {
+  eat: () => tone(520, .12, 'sine', .18, 1.9),
+  level: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, .2, 'triangle', .2, 1, i * .09)),
+  over: () => tone(320, .8, 'sawtooth', .18, .2),
+  tick: () => tone(440, .09, 'square', .07),
+  go: () => tone(880, .3, 'square', .1)
+};
+
+/* ===== ЖАРДАМЧЫ ФУНКЦИЯЛАР ===== */
+const pad = n => String(n).padStart(4, '0');
+const speedFor = l => l <= 8 ? SPEEDS[l - 1] : Math.max(38, 58 - (l - 8) * 4);
+const show = (el, on) => el.classList.toggle('hide', !on);
+function bump(el) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+
+function updateHud() {
+  $('#sc').textContent = pad(score || 0);
+  $('#lv').textContent = level || 1;
+  $('#hs').textContent = pad(hi);
+  const l = level || 1, into = (score || 0) - (l - 1) * STEP;
+  $('#pLevel').textContent = `LEVEL ${l} — ${NAMES[Math.min(l, 8) - 1]}`;
+  $('#pNext').textContent = `NEXT LEVEL: ${l * STEP}`;
+  $('#barFill').style.width = (into / STEP * 100) + '%';
+  $('#speed').classList.toggle('on', l >= 6);   // жогорку деңгээлде SPEED MODE
+}
+
+function applyTheme() {
+  const t = THEMES[themeIdx], r = document.documentElement.style;
+  r.setProperty('--a', `hsl(${t.h1} 100% 55%)`); r.setProperty('--b', `hsl(${t.h2} 100% 55%)`);
+}
+
+/* ===== ОЮНДУ БАШТОО ===== */
+function startGame() {
+  ac = ac || new (window.AudioContext || window.webkitAudioContext)();   // үн колдонуучунун басуусунан кийин ачылат
+  ac.resume();
+  snake = [{x: 10, y: 10}, {x: 9, y: 10}, {x: 8, y: 10}];
+  prev = snake.map(s => ({...s}));
+  dir = {x: 1, y: 0}; queue = []; score = 0; level = 1; parts = [];
+  interval = speedFor(1);
+  document.documentElement.style.setProperty('--hue', '0deg');
+  spawnFood(); updateHud();
+  ['#ovStart', '#ovOver', '#ovPause'].forEach(s => show($(s), false));
+  // 3 → 2 → 1 → GO!
+  state = 'count'; show($('#ovCount'), true);
+  let n = 3; const c = $('#count');
+  const setC = t => { c.textContent = t; c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; };
+  setC(3); sfx.tick(); clearInterval(countTimer);
+  countTimer = setInterval(() => {
+    n--;
+    if (n > 0) { setC(n); sfx.tick(); }
+    else if (n === 0) { setC('GO!'); sfx.go(); }
+    else { clearInterval(countTimer); show($('#ovCount'), false); state = 'play'; last = performance.now(); }
+  }, 700);
+}
+const restartGame = startGame;
+
+/* ===== ЖЫЛУУ ЖАНА ЭСЕПТӨӨ ===== */
+function spawnFood() {
+  do { food = {x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N)}; }
+  while (snake.some(s => s.x === food.x && s.y === food.y));   // жыландын үстүнө түшпөсүн
+}
+
+function moveSnake() {
+  prev = snake.map(s => ({...s}));
+  if (queue.length) dir = queue.shift();                         // кезектеги багыт
+  const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {                  // тамак жедик
+    score++; sfx.eat(); bump($('#sc'));
+    for (let i = 0; i < 14; i++) {                               // particle эффект
+      const a = Math.random() * 6.28, v = 1 + Math.random() * 3;
+      parts.push({x: (food.x + .5) * CELL, y: (food.y + .5) * CELL, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1});
+    }
+    spawnFood();
+    if (Math.floor(score / STEP) + 1 > level) increaseLevel();
+    updateHud();
+  } else snake.pop();
+}
+
+function checkCollision() {
+  const h = snake[0];
+  return h.x < 0 || h.y < 0 || h.x >= N || h.y >= N || snake.slice(1).some(s => s.x === h.x && s.y === h.y);
+}
+
+function increaseLevel() {
+  level = Math.floor(score / STEP) + 1;
+  interval = speedFor(level);                                    // деңгээл өскөн сайын тезирээк
+  sfx.level();
+  const lu = $('#lvlup'); lu.classList.remove('show'); void lu.offsetWidth; lu.classList.add('show');
+  const b = $('#board'); b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
+  document.documentElement.style.setProperty('--hue', ((level - 1) * 22) + 'deg');  // фон өзгөрөт
+}
+
+function updateGame() {
+  moveSnake();
+  if (checkCollision()) { snake = prev; gameOver(); }
+}
+
+function gameOver() {
+  state = 'over'; sfx.over(); shake = 14;
+  const isNew = score > hi && score > 0;
+  if (isNew) { hi = score; try { localStorage.setItem('snake-hi', hi); } catch (e) {} }
+  $('#oScore').textContent = pad(score); $('#oLevel').textContent = level; $('#oBest').textContent = pad(hi);
+  $('#newhi').hidden = !isNew; updateHud();
+  setTimeout(() => state === 'over' && show($('#ovOver'), true), 600);
+}
+
+function togglePause() {
+  if (state === 'play') { state = 'pause'; show($('#ovPause'), true); $('#btnPause').textContent = '▶ RESUME'; }
+  else if (state === 'pause') { state = 'play'; last = performance.now(); show($('#ovPause'), false); $('#btnPause').textContent = '⏸ PAUSE'; }
+}
+
+/* ===== БАШКАРУУ ===== */
+function setDir(x, y) {
+  if (state !== 'play') return;
+  const l = queue.length ? queue[queue.length - 1] : dir;
+  if ((x === -l.x && y === -l.y) || (x === l.x && y === l.y)) return;   // артка буруу мүмкүн эмес
+  if (queue.length < 2) queue.push({x, y});
+}
+addEventListener('keydown', e => {
+  const k = {ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0]}[e.key];
+  if (k) { e.preventDefault(); setDir(...k); }
+  else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'Enter' && (state === 'menu' || state === 'over')) startGame();
+});
+document.querySelectorAll('.dpad button').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); setDir(...b.dataset.d.split(',').map(Number)); }));
+let tx, ty;  // сүрүп башкаруу (swipe)
+$('#board').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, {passive: true});
+$('#board').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+  Math.abs(dx) > Math.abs(dy) ? setDir(dx > 0 ? 1 : -1, 0) : setDir(0, dy > 0 ? 1 : -1);
+}, {passive: true});
+$('#btnStart').onclick = startGame; $('#btnAgain').onclick = restartGame;
+$('#btnPause').onclick = togglePause; $('#btnResume').onclick = togglePause;
+$('#btnSound').onclick = e => { soundOn = !soundOn; e.target.textContent = '🔊 SOUND: ' + (soundOn ? 'ON' : 'OFF'); };
+$('#btnTheme').onclick = () => { themeIdx = (themeIdx + 1) % THEMES.length; applyTheme(); };
+
+/* ===== ЧИЙҮҮ ===== */
+function rr(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawGame(now) {
+  const t = state === 'play' ? Math.min(1, (now - last) / interval) : 1;   // жумшак кыймыл үчүн интерполяция
+  const th = THEMES[themeIdx];
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (shake > 0) { ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake); shake *= .85; if (shake < .5) shake = 0; }
+
+  ctx.strokeStyle = 'rgba(255,255,255,.04)'; ctx.lineWidth = 1;     // жука тор
+  for (let i = 1; i < N; i++) { ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, cv.height); ctx.moveTo(0, i * CELL); ctx.lineTo(cv.width, i * CELL); ctx.stroke(); }
+  if (!snake) return;
+
+  // тамак: жарык orb (пульс менен)
+  const p = 1 + Math.sin(now / 160) * .14, fx = (food.x + .5) * CELL, fy = (food.y + .5) * CELL, R = CELL * .34 * p;
+  const g = ctx.createRadialGradient(fx - 3, fy - 3, 1, fx, fy, R * 1.2);
+  g.addColorStop(0, '#fff'); g.addColorStop(.4, '#ff6fb8'); g.addColorStop(1, '#ff3d9a');
+  ctx.shadowColor = '#ff3d9a'; ctx.shadowBlur = 24; ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(fx, fy, R, 0, 6.28); ctx.fill();
+  ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,61,154,.5)'; ctx.beginPath(); ctx.arc(fx, fy, R * 1.6 + Math.sin(now / 200) * 2, 0, 6.28); ctx.stroke();
+
+  // жылан (куйруктан башка карай)
+  const len = snake.length;
+  for (let i = len - 1; i >= 0; i--) {
+    const c = snake[i], o = prev[i] || prev[prev.length - 1] || c;
+    const x = (o.x + (c.x - o.x) * t) * CELL, y = (o.y + (c.y - o.y) * t) * CELL, k = i / Math.max(1, len - 1);
+    ctx.shadowColor = `hsl(${th.h1 + (th.h2 - th.h1) * k} 100% 55%)`; ctx.shadowBlur = i === 0 ? 20 : 12;
+    ctx.fillStyle = `hsl(${th.h1 + (th.h2 - th.h1) * k} 100% ${i === 0 ? 62 : 52 - k * 8}%)`;
+    const m = i === 0 ? 1 : 3 + k * 2;                                   // куйрук ичкериледи
+    rr(x + m, y + m, CELL - m * 2, CELL - m * 2, i === 0 ? 11 : 9); ctx.fill();
+    if (i === 0) {                                                       // баш: көздөр багытты көрсөтөт
+      ctx.shadowBlur = 0; const cx = x + CELL / 2, cy = y + CELL / 2, f = CELL * .17, s = CELL * .22;
+      [[-1], [1]].forEach(([sg]) => {
+        const ex = cx + dir.x * f - dir.y * s * sg, ey = cy + dir.y * f + dir.x * s * sg;
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, 4.2, 0, 6.28); ctx.fill();
+        ctx.fillStyle = '#05060d'; ctx.beginPath(); ctx.arc(ex + dir.x * 1.6, ey + dir.y * 1.6, 2.1, 0, 6.28); ctx.fill();
+      });
+    }
+  }
+  // particle'дер
+  ctx.shadowBlur = 0;
+  parts = parts.filter(q => q.life > 0);
+  parts.forEach(q => { q.x += q.vx; q.y += q.vy; q.life -= .035; ctx.globalAlpha = q.life; ctx.fillStyle = '#ff6fb8'; ctx.beginPath(); ctx.arc(q.x, q.y, 3 * q.life + 1, 0, 6.28); ctx.fill(); });
+  ctx.globalAlpha = 1;
+}
+
+/* ===== НЕГИЗГИ ЦИКЛ ===== */
+function frame(now) {
+  if (state === 'play' && now - last >= interval) { last = now; updateGame(); }
+  drawGame(now);
+  requestAnimationFrame(frame);
+}
+
+/* ===== ФОНДОГУ БӨЛҮКЧӨЛӨР ===== */
+for (let i = 0; i < 26; i++) {
+  const d = document.createElement('span'), s = 2 + Math.random() * 3;
+  d.className = 'dot'; d.style.cssText = `left:${Math.random() * 100}%;width:${s}px;height:${s}px;animation-duration:${14 + Math.random() * 20}s;animation-delay:-${Math.random() * 30}s`;
+  $('.bg').appendChild(d);
+}
+
+snake = [{x: 10, y: 10}, {x: 9, y: 10}, {x: 8, y: 10}]; prev = snake.map(s => ({...s})); dir = {x: 1, y: 0};
+food = {x: 15, y: 10}; score = 0; level = 1;   // старт экранынын артында көрүнүп турушу үчүн
+applyTheme(); updateHud(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
